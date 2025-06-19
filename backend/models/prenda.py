@@ -1,17 +1,17 @@
-from typing import List, Optional
-from pydantic import BaseModel, EmailStr
+from typing import Optional
+from pydantic import BaseModel
 
-class UserCreate(BaseModel):
-    username: str
-    email: EmailStr
-    password: str
-    rol: str  # "final" o "admin"
+class PrendaCreate(BaseModel):
+    nombre: str
+    tipo: str
+    descripcion: str
+    marca: str
 
-class UserOut(BaseModel):
+class PrendaOut(BaseModel):
     id: str
-    username: str
-    email: EmailStr
-    rol: str
-    profile_image_path: Optional[str] = None
-    historial: List[str] = []
-    favoritos: List[str] = []
+    nombre: str
+    tipo: str
+    descripcion: str
+    marca: str
+    image_path: Optional[str] = None        
+    image_public_id: Optional[str] = None   

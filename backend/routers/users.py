@@ -63,9 +63,26 @@ async def subir_profile_image(
     user_id: str,
     file: UploadFile = File(...)
 ):
-    # Sube imagen a cloudinary y guarda el URL
-    image_url = await upload_image_to_cloudinary(file, folder="usuarios/profile")
-    db["usuarios"].update_one({"_id": ObjectId(user_id)}, {"$set": {"profile_image_path": image_url}})
+    usuario = db["usuarios"].find_one({"_id": ObjectId(user_id)})
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    # Si ya tiene imagen, la borramos de Cloudinary
+    anterior_info = usuario.get("profile_image_path")
+    anterior_public_id = usuario.get("profile_image_public_id")
+    if anterior_public_id:
+        try:
+            await delete_image_cloudinary(anterior_public_id)
+        except Exception as e:
+            # Si falla el borrado, no cortamos el flujo
+            print(f"Error borrando imagen anterior de Cloudinary: {e}")
+
+    # Subir la nueva imagen
+    image_url, public_id = await upload_image_to_cloudinary(file, folder="usuarios/profile")
+    db["usuarios"].update_one(
+        {"_id": ObjectId(user_id)},
+        {"$set": {"profile_image_path": image_url, "profile_image_public_id": public_id}}
+    )
     return {"profile_image_path": image_url}
 
 @router.get("/usuarios/{user_id}/historial")
