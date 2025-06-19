@@ -3,7 +3,7 @@ from backend.routers import users, prendas, imagen
 
 app = FastAPI(
     title="Zarpado API",
-    description="Backend Cloud-Ready - FastAPI + MongoDB Atlas + Neo4j + Cloudinary",
+    description="Backend listo para Railway, MongoDB Atlas, Neo4j Aura, Cloudinary.",
     version="1.0.0"
 )
 
