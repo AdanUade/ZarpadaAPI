@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
-from db.mongo import db
+from backend.db.mongo import db
 from bson.objectid import ObjectId
 from models.user import UserCreate, UserOut
 from utils.cloudinary_helper import upload_image_to_cloudinary
