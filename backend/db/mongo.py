@@ -1,4 +1,6 @@
 import os
 from pymongo import MongoClient
-client = MongoClient(os.environ["MONGO_URI"])
-db = client[os.environ.get("MONGO_DB", "zarpado_db")]
+
+MONGO_URI = os.environ["MONGO_URI"]
+client = MongoClient(MONGO_URI)
+db = client["zarpado_db"]

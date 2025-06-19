@@ -1,8 +1,11 @@
 fastapi
+google-genai
 uvicorn
 pymongo
 neo4j
 python-multipart
-google-genai
+pydantic
 cloudinary
 email_validator
+python-dotenv
+Pillow
