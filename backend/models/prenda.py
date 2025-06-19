@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from db.mongo import db
 from bson.objectid import ObjectId
 from models.prenda import PrendaOut
-from utils.cloudinary_helper import upload_image_to_cloudinary
+from backend.utils.cloudinary_helper import upload_image_to_cloudinary
 
 router = APIRouter()
 
