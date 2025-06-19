@@ -137,22 +137,32 @@ async def probar_prenda(
     output_buf = BytesIO()
     img_result.save(output_buf, format="JPEG")
     output_buf.seek(0)
-    url_result, _ = await upload_image_to_cloudinary(output_buf, folder="historial")
+    url_result, public_id = await upload_image_to_cloudinary(output_buf, folder="historial")
 
-    usuario = db["usuarios"].find_one({"_id": ObjectId(user_id)})
-    if not usuario:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
-    historial = usuario.get("historial", [])
-    if len(historial) >= 5:
-        historial.pop(0)
-    historial.append(url_result)
-    db["usuarios"].update_one(
+    old_doc = db["usuarios"].find_one_and_update(
         {"_id": ObjectId(user_id)},
-        {"$set": {"historial": historial}}
+        {
+            "$push": {
+                "historial": {
+                    "$each": [{"url": url_result, "public_id": public_id}],
+                    "$slice": -5
+                }
+            }
+        },
+        return_document=ReturnDocument.BEFORE
     )
+    if not old_doc:
+        raise HTTPException(404, "Usuario no encontrado")
 
-    return {
-        "img_generada": url_result,
-        "historial": historial
-    }
+    # 3) Si antes ya tenía 5 o más, eliminar la expulsada de Cloudinary
+    old_hist = old_doc.get("historial", [])
+    if len(old_hist) >= 5:
+        # la expulsada será old_hist[0]
+        try:
+            await delete_image_cloudinary(old_hist[0]["public_id"])
+        except Exception:
+            pass  # opcionalmente loggear
+
+    # 4) Devuelve únicamente la URL de la nueva imagen
+    return {"img_generada": url_result}
