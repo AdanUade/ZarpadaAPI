@@ -5,3 +5,4 @@ neo4j
 python-multipart
 google-genai
 cloudinary
+email_validator
