@@ -6,6 +6,7 @@ from fastapi import FastAPI
 app = FastAPI()
 
 app.include_router(router, prefix="/api", tags=["usuarios"])
+app.include_router(router, prefix="/api", tags=["prendas"])
 
 @app.get("/mongo-test")
 def mongo_test():
