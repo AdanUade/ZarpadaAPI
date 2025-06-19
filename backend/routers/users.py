@@ -4,7 +4,7 @@ from backend.db.mongo import db
 from backend.models.user import UserCreate, UserOut
 from backend.utils.cloudinary_helper import upload_image_to_cloudinary, delete_image_cloudinary
 
-router = APIRouter(prefix="/api", tags=["usuarios"])
+router = APIRouter(prefix="/usuarios", tags=["usuarios"])
 
 def normalize_user(u: dict) -> dict:
     u["id"] = str(u["_id"])
