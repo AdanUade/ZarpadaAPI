@@ -1,5 +1,6 @@
 import cloudinary
 import cloudinary.uploader
+from PIL import Image
 from io import BytesIO
 
 import os
@@ -13,27 +14,40 @@ cloudinary.config(
 )
 
 async def upload_image_to_cloudinary(file_or_bytes, folder="default"):
+    """
+    Acepta UploadFile, bytes o BytesIO, convierte a JPEG y lo sube a Cloudinary.
+    Devuelve (secure_url, public_id).
+    """
+    # 1) Extraer bytes raw
+    if hasattr(file_or_bytes, "file"):
+        raw = file_or_bytes.file.read()
+    elif isinstance(file_or_bytes, BytesIO):
+        file_or_bytes.seek(0)
+        raw = file_or_bytes.read()
+    elif isinstance(file_or_bytes, (bytes, bytearray)):
+        raw = file_or_bytes
+    else:
+        raise ValueError("Tipo de archivo no soportado")
+
+    # 2) Convertir a JPEG con PIL
     try:
-        # Si es UploadFile, extraigo el .file
-        if isinstance(file_or_bytes, UploadFile):
-            file_to_upload = file_or_bytes.file
-        # Si es BytesIO, me quedo con el buffer directamente
-        elif isinstance(file_or_bytes, BytesIO):
-            file_to_upload = file_or_bytes
-        # Si es bytes, lo convierto a BytesIO
-        elif isinstance(file_or_bytes, bytes):
-            file_to_upload = BytesIO(file_or_bytes)
-        else:
-            raise ValueError("Tipo de archivo no soportado")
-
-        # Sube a Cloudinary
-        result = cloudinary.uploader.upload(file_to_upload, folder=folder)
-        url = result["secure_url"]
-        public_id = result["public_id"]
-        return url, public_id
-
+        img = Image.open(BytesIO(raw)).convert("RGB")
     except Exception as e:
-        raise Exception(f"Error subiendo imagen a Cloudinary: {e}")
+        raise ValueError(f"Error al decodificar imagen: {e}")
+
+    buf = BytesIO()
+    img.save(buf, format="JPEG", quality=90)
+    buf.seek(0)
+
+    # 3) Subir el JPEG a Cloudinary
+    result = cloudinary.uploader.upload(
+        buf,
+        folder=folder,
+        format="jpg",        # fuerza extensión .jpg
+        overwrite=True,
+    )
+
+    return result["secure_url"], result["public_id"]
     
 async def delete_image_cloudinary(public_id: str):
     try:
