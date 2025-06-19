@@ -1,17 +1,12 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
-from backend.routers import users, prendas
-from backend.utils.cloudinary_helper import upload_image_to_cloudinary
 from backend.db.mongo import db
+from backend.db.neo4j import driver
+from backend.routers.users import router
+from fastapi import FastAPI
 
 app = FastAPI()
 
-app.include_router(users.router, prefix="/api", tags=["usuarios"])
+app.include_router(router, prefix="/api", tags=["usuarios"])
 
-@app.get("/")
-def health():
-    return {"status": "ok"}
-
-# Test de conexión a MongoDB
 @app.get("/mongo-test")
 def mongo_test():
     try:
@@ -20,11 +15,12 @@ def mongo_test():
     except Exception as e:
         return {"mongo_status": "error", "detail": str(e)}
 
-# Test de subida de imagen a Cloudinary
-@app.post("/cloudinary-test")
-async def cloudinary_test(file: UploadFile = File(...)):
+@app.get("/neo4j-test")
+def neo4j_test():
     try:
-        url = await upload_image_to_cloudinary(file, folder="test")
-        return {"cloudinary_url": url}
+        with driver.session() as session:
+            result = session.run("RETURN 1 AS test")
+            value = result.single()["test"]
+        return {"neo4j_status": "ok", "test_value": value}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"neo4j_status": "error", "detail": str(e)}
