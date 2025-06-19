@@ -134,26 +134,29 @@ async def probar_prenda(
         raise HTTPException(status_code=500, detail="Gemini no devolvió imagen resultante")
 
     # >>> Cambia este bloque <<<
-    # 1. Guarda la imagen en memoria y subila a Cloudinary:
     output_buf = BytesIO()
     img_result.save(output_buf, format="JPEG", quality=90)
     output_buf.seek(0)
 
-    # 2) Subirlo DIRECTO al helper (BytesIO cumple read/seek)
+    # 2) Subir en background
     try:
-        url_result, public_id = await upload_image_to_cloudinary(output_buf, folder="historial")
+        url_result, public_id = await upload_image_to_cloudinary(
+            output_buf, folder="historial"
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"No pude subir a Cloudinary: {e}")
 
-    # 3) Actualizar historial en el usuario
+    # 3) Actualizar historial en Mongo (y borrar antiguas)
     usuario = db["usuarios"].find_one({"_id": ObjectId(user_id)})
     if not usuario:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        raise HTTPException(404, "Usuario no encontrado")
 
     historial = usuario.get("historial", [])
     if len(historial) >= 5:
-        viejo = historial.pop(0)
-        await delete_image_cloudinary(viejo["public_id"])
+        antiguo = historial.pop(0)
+        # borramos la imagen antigua ASÍNCRONAMENTE
+        if "public_id" in antiguo:
+            await delete_image_cloudinary(antiguo["public_id"])
 
     historial.append({"url": url_result, "public_id": public_id})
     db["usuarios"].update_one(
