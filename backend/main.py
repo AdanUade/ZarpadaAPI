@@ -6,7 +6,6 @@ from backend.db.mongo import db
 app = FastAPI()
 
 app.include_router(users.router, prefix="/api", tags=["usuarios"])
-app.include_router(prendas.router, prefix="/api", tags=["prendas"])
 
 @app.get("/")
 def health():
