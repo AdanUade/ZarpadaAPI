@@ -9,9 +9,6 @@ cloudinary.config(
     secure=True,
 )
 
-import cloudinary
-import cloudinary.uploader
-
 async def upload_image_to_cloudinary(file: UploadFile, folder: str = "default"):
     try:
         # DEBUG: chequea tipo de archivo y tamaño
