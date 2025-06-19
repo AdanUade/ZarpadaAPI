@@ -9,7 +9,7 @@ app = FastAPI(
 
 app.include_router(users.router,   prefix="/api", tags=["usuarios"])
 app.include_router(prendas.router, prefix="/api", tags=["prendas"])
-app.include_router(imagen.router,  prefix="/api", tags=["imagen"])
+#app.include_router(imagen.router,  prefix="/api", tags=["imagen"])
 
 @app.get("/")
 def health():
