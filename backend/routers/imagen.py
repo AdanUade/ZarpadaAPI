@@ -50,7 +50,7 @@ def descripcion_prenda(imagen_prenda: Image.Image) -> str:
     )
     return response.candidates[0].content.parts[0].text
 
-@router.post("/probar_prenda")
+@router.post("/probador")
 async def probar_prenda(
     user_id: str = Form(...),
     file_prenda: UploadFile = File(...),

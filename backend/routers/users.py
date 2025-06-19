@@ -19,7 +19,7 @@ def normalize_user(u: dict) -> dict:
     ]
     return u
 
-@router.post("/usuarios", response_model=UserOut)
+@router.post("/", response_model=UserOut)
 async def crear_usuario(user: UserCreate):
     user_dict = user.dict()
     user_dict.update({
@@ -32,19 +32,19 @@ async def crear_usuario(user: UserCreate):
     nuevo = db["usuarios"].find_one({"_id": res.inserted_id})
     return normalize_user(nuevo)
 
-@router.get("/usuarios", response_model=list[UserOut])
+@router.get("/", response_model=list[UserOut])
 def obtener_usuarios():
     users = list(db["usuarios"].find())
     return [normalize_user(u) for u in users]
 
-@router.get("/usuarios/{user_id}", response_model=UserOut)
+@router.get("/{user_id}", response_model=UserOut)
 def obtener_usuario(user_id: str):
     u = db["usuarios"].find_one({"_id": ObjectId(user_id)})
     if not u:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     return normalize_user(u)
 
-@router.patch("/usuarios/{user_id}", response_model=UserOut)
+@router.patch("/{user_id}", response_model=UserOut)
 async def editar_usuario(
     user_id: str,
     username: str = Form(None),
@@ -68,7 +68,7 @@ async def editar_usuario(
     u = db["usuarios"].find_one({"_id": ObjectId(user_id)})
     return normalize_user(u)
 
-@router.delete("/usuarios/{user_id}")
+@router.delete("/{user_id}")
 async def eliminar_usuario(user_id: str):
     u = db["usuarios"].find_one({"_id": ObjectId(user_id)})
     if not u:
@@ -92,7 +92,7 @@ async def eliminar_usuario(user_id: str):
 
     return {"msg": "Usuario eliminado"}
 
-@router.patch("/usuarios/{user_id}/profile_image")
+@router.patch("/{user_id}/profile_image")
 async def subir_profile_image(
     user_id: str,
     file: UploadFile = File(...)
@@ -119,14 +119,14 @@ async def subir_profile_image(
     return {"profile_image_path": url}
 
 # Los endpoints de historial y favoritos solo devuelven strings, no dicts
-@router.get("/usuarios/{user_id}/historial")
+@router.get("/{user_id}/historial")
 def ver_historial(user_id: str):
     u = db["usuarios"].find_one({"_id": ObjectId(user_id)})
     if not u:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     return {"historial": normalize_user(u)["historial"]}
 
-@router.delete("/usuarios/{user_id}/historial/{idx}")
+@router.delete("/{user_id}/historial/{idx}")
 async def eliminar_img_historial(user_id: str, idx: int):
     u = db["usuarios"].find_one({"_id": ObjectId(user_id)})
     if not u:
@@ -149,14 +149,14 @@ async def eliminar_img_historial(user_id: str, idx: int):
     )
     return {"historial": [e["url"] if isinstance(e, dict) else e for e in historial]}
 
-@router.get("/usuarios/{user_id}/favoritos")
+@router.get("/{user_id}/favoritos")
 def ver_favoritos(user_id: str):
     u = db["usuarios"].find_one({"_id": ObjectId(user_id)})
     if not u:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     return {"favoritos": normalize_user(u)["favoritos"]}
 
-@router.post("/usuarios/{user_id}/favoritos")
+@router.post("/{user_id}/favoritos")
 async def agregar_favorito(
     user_id: str,
     image_url: str = Form(...)
@@ -175,7 +175,7 @@ async def agregar_favorito(
         )
     return {"favoritos": favoritos}
 
-@router.delete("/usuarios/{user_id}/favoritos/{idx}")
+@router.delete("/{user_id}/favoritos/{idx}")
 def quitar_favorito(user_id: str, idx: int):
     u = db["usuarios"].find_one({"_id": ObjectId(user_id)})
     if not u:
