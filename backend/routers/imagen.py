@@ -1,7 +1,7 @@
 import os
 import uuid
 from io import BytesIO
-
+from pymongo import ReturnDocument                                                                           # ← IMPORTA ReturnDocument
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from PIL import Image
 from bson.objectid import ObjectId
@@ -9,7 +9,7 @@ from google import genai
 from google.genai import types
 
 from backend.db.mongo import db
-from backend.utils.cloudinary_helper import upload_image_to_cloudinary  # <-- Necesario
+from backend.utils.cloudinary_helper import upload_image_to_cloudinary, delete_image_cloudinary
 from dotenv import load_dotenv
 load_dotenv()
 
