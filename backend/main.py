@@ -1,5 +1,8 @@
 from backend.db.mongo import db
 from backend.db.neo4j import driver
+from fastapi import FastAPI
+
+app = FastAPI()
 
 @app.get("/mongo-test")
 def mongo_test():
