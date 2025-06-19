@@ -17,22 +17,17 @@ async def upload_image_to_cloudinary(file_or_bytes, folder="default"):
         # Si es UploadFile, extraigo el .file
         if isinstance(file_or_bytes, UploadFile):
             file_to_upload = file_or_bytes.file
-            file_to_upload.seek(0)
+        # Si es BytesIO, me quedo con el buffer directamente
         elif isinstance(file_or_bytes, BytesIO):
             file_to_upload = file_or_bytes
-            file_to_upload.seek(0)
+        # Si es bytes, lo convierto a BytesIO
         elif isinstance(file_or_bytes, bytes):
             file_to_upload = BytesIO(file_or_bytes)
-            file_to_upload.seek(0)
         else:
-            raise ValueError("Tipo de archivo no soportado (debe ser UploadFile, BytesIO o bytes)")
+            raise ValueError("Tipo de archivo no soportado")
 
-        # Siempre forzar resource_type="image", Cloudinary lo detecta solo
-        result = cloudinary.uploader.upload(
-            file_to_upload,
-            folder=folder,
-            resource_type="image"
-        )
+        # Sube a Cloudinary
+        result = cloudinary.uploader.upload(file_to_upload, folder=folder)
         url = result["secure_url"]
         public_id = result["public_id"]
         return url, public_id

@@ -52,7 +52,27 @@ def editar_usuario(
     return usuario
 
 @router.delete("/usuarios/{user_id}")
-def eliminar_usuario(user_id: str):
+async def eliminar_usuario(user_id: str):
+    usuario = db["usuarios"].find_one({"_id": ObjectId(user_id)})
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    profile_public_id = usuario.get("profile_image_public_id")
+    if profile_public_id:
+        await delete_image_cloudinary(profile_public_id)
+
+    historial = usuario.get("historial", [])
+    for img in historial:
+        public_id = img.get("public_id") if isinstance(img, dict) else img
+        if public_id:
+            await delete_image_cloudinary(public_id)
+
+    favoritos = usuario.get("favoritos", [])
+    for img in favoritos:
+        public_id = img.get("public_id") if isinstance(img, dict) else img
+        if public_id:
+            await delete_image_cloudinary(public_id)
+
     res = db["usuarios"].delete_one({"_id": ObjectId(user_id)})
     if res.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
@@ -67,17 +87,14 @@ async def subir_profile_image(
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
-    # Si ya tiene imagen, la borramos de Cloudinary
     anterior_info = usuario.get("profile_image_path")
     anterior_public_id = usuario.get("profile_image_public_id")
     if anterior_public_id:
         try:
             await delete_image_cloudinary(anterior_public_id)
         except Exception as e:
-            # Si falla el borrado, no cortamos el flujo
             print(f"Error borrando imagen anterior de Cloudinary: {e}")
 
-    # Subir la nueva imagen
     image_url, public_id = await upload_image_to_cloudinary(file, folder="usuarios/profile")
     db["usuarios"].update_one(
         {"_id": ObjectId(user_id)},
@@ -100,13 +117,11 @@ async def eliminar_img_historial(user_id: str, img_idx: int):
     historial = usuario.get("historial", [])
     try:
         img_info = historial.pop(img_idx)
-        # Borrar de Cloudinary
         public_id = img_info.get("public_id")
         if public_id:
             try:
                 await delete_image_cloudinary(public_id)
             except Exception as e:
-                # Si falla Cloudinary, igual lo sacás del historial local
                 print(f"Error eliminando en Cloudinary: {e}")
 
         db["usuarios"].update_one({"_id": ObjectId(user_id)}, {"$set": {"historial": historial}})
