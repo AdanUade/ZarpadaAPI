@@ -7,8 +7,6 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# No montes StaticFiles: las imágenes están en Cloudinary
-
 app.include_router(users.router,   prefix="/api", tags=["usuarios"])
 app.include_router(prendas.router, prefix="/api", tags=["prendas"])
 app.include_router(imagen.router,  prefix="/api", tags=["imagen"])
