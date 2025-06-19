@@ -4,3 +4,4 @@ pymongo
 neo4j
 python-multipart
 google-genai
+cloudinary
