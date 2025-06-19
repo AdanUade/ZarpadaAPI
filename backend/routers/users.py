@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from backend.db.mongo import db
 from bson.objectid import ObjectId
 from backend.models.user import UserCreate, UserOut
-from backend.utils.cloudinary_helper import upload_image_to_cloudinary
+from backend.utils.cloudinary_helper import upload_image_to_cloudinary, delete_image_cloudinary
 
 router = APIRouter()
 
@@ -93,14 +93,22 @@ def ver_historial(user_id: str):
     return {"historial": usuario.get("historial", [])}
 
 @router.delete("/usuarios/{user_id}/historial/{img_idx}")
-def eliminar_img_historial(user_id: str, img_idx: int):
+async def eliminar_img_historial(user_id: str, img_idx: int):
     usuario = db["usuarios"].find_one({"_id": ObjectId(user_id)})
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     historial = usuario.get("historial", [])
     try:
-        img_url = historial.pop(img_idx)
-        # No borramos la imagen en cloudinary (opcional: podés agregar lógica para borrar de Cloudinary)
+        img_info = historial.pop(img_idx)
+        # Borrar de Cloudinary
+        public_id = img_info.get("public_id")
+        if public_id:
+            try:
+                await delete_image_cloudinary(public_id)
+            except Exception as e:
+                # Si falla Cloudinary, igual lo sacás del historial local
+                print(f"Error eliminando en Cloudinary: {e}")
+
         db["usuarios"].update_one({"_id": ObjectId(user_id)}, {"$set": {"historial": historial}})
         return {"historial": historial}
     except IndexError:
