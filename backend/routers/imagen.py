@@ -1,5 +1,4 @@
 import os
-import uuid
 from io import BytesIO
 
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
@@ -9,47 +8,46 @@ from google import genai
 from google.genai import types
 
 from backend.db.mongo import db
-from backend.utils.cloudinary_helper import upload_image_to_cloudinary, delete_image_cloudinary
+from backend.utils.cloudinary_helper import upload_image_to_cloudinary
 from dotenv import load_dotenv
 
 load_dotenv()
 
-router = APIRouter()
+router = APIRouter(prefix="/api", tags=["imagen"])
 
+# Inicializa el cliente de Gemini
 GENAI_API_KEY = os.environ.get("GOOGLE_API_KEY")
 if not GENAI_API_KEY:
     raise RuntimeError("No se encontró GOOGLE_API_KEY en el entorno.")
-
 client = genai.Client(api_key=GENAI_API_KEY)
 
-def get_mime_type_bytes(data: bytes) -> str:
-    header = data[:12]
-    if header.startswith(b"\xff\xd8"):
-        return "image/jpeg"
-    if header.startswith(b"\x89PNG"):
-        return "image/png"
-    if header[:4] == b"RIFF" and header[8:12] == b"WEBP":
-        return "image/webp"
-    return "application/octet-stream"
 
-def convert_pil_to_jpeg_bytes(img: Image.Image) -> bytes:
+def normalize_to_jpeg(data: bytes) -> bytes:
+    """
+    Convierte cualquier byte array de imagen a JPEG (RGB).
+    """
+    img = Image.open(BytesIO(data)).convert("RGB")
     buf = BytesIO()
-    img.convert("RGB").save(buf, format="JPEG")
-    buf.seek(0)
-    return buf
+    img.save(buf, format="JPEG")
+    return buf.getvalue()
 
-def descripcion_prenda(imagen_prenda: Image.Image) -> str:
-    response = client.models.generate_content(
+
+def descripcion_prenda(img: Image.Image) -> str:
+    """
+    Genera la descripción de la prenda usando Gemini.
+    """
+    resp = client.models.generate_content(
         model="gemini-2.0-flash",
         contents=[
             "SOLO DAME LA DESCRIPCION EL TIPO DE PRENDA Y CARACTERISTICAS SOBRE SALIENTES, "
             "Ejemplo de salida (Anorak: Ligero, de nailon, con cremallera corta, capucha con cordón y detalles en bloques de color (azul y negro) en los hombros y las mangas. Logotipo KINGOFTHEKONGO, ADIDAS, etc.). "
             "LA SALIDA ESPERADA TIENE QUE SER EN INGLÉS",
-            imagen_prenda
+            img
         ],
-        config=types.GenerateContentConfig(response_modalities=['Text'])
+        config=types.GenerateContentConfig(response_modalities=["Text"])
     )
-    return response.candidates[0].content.parts[0].text
+    return resp.candidates[0].content.parts[0].text
+
 
 @router.post("/probar_prenda")
 async def probar_prenda(
@@ -57,114 +55,75 @@ async def probar_prenda(
     file_prenda: UploadFile = File(...),
     file_usuario: UploadFile = File(...)
 ):
-    contenido_prenda = await file_prenda.read()
-    contenido_usuario = await file_usuario.read()
+    # 1) Leer y normalizar imágenes a JPEG bytes
+    prenda_bytes = await file_prenda.read()
+    if not prenda_bytes.startswith(b"\xff\xd8"):
+        prenda_bytes = normalize_to_jpeg(prenda_bytes)
 
-    mime_prenda = get_mime_type_bytes(contenido_prenda)
-    try:
-        if mime_prenda != "image/jpeg":
-            tmp = Image.open(BytesIO(contenido_prenda)).convert("RGB")
-            contenido_prenda = convert_pil_to_jpeg_bytes(tmp).getvalue()
-        img_prenda = Image.open(BytesIO(contenido_prenda))
-    except Exception:
-        raise HTTPException(status_code=400, detail="La imagen de la prenda no es válida")
+    usuario_bytes = await file_usuario.read()
+    if not usuario_bytes.startswith(b"\xff\xd8"):
+        usuario_bytes = normalize_to_jpeg(usuario_bytes)
 
-    mime_usuario = get_mime_type_bytes(contenido_usuario)
-    try:
-        if mime_usuario != "image/jpeg":
-            tmp2 = Image.open(BytesIO(contenido_usuario)).convert("RGB")
-            contenido_usuario = convert_pil_to_jpeg_bytes(tmp2).getvalue()
-        img_usuario = Image.open(BytesIO(contenido_usuario))
-    except Exception:
-        raise HTTPException(status_code=400, detail="La imagen del usuario no es válida")
+    img_prenda = Image.open(BytesIO(prenda_bytes))
+    img_usuario = Image.open(BytesIO(usuario_bytes))
 
+    # 2) Generar descripción de la prenda
     prenda = descripcion_prenda(img_prenda)
 
     prompt = (f"""Replace the {prenda} worn by the subject in Image 2 with the exact {prenda} from Image 1, ensuring a realistic and seamless integration. The face and background of Image 2 MUST remain completely unaltered.
 
-    I. Prenda Extraction and Preservation (Image1):
+I. Prenda Extraction and Preservation (Image1):
 
-    Precisely isolate the {prenda} in (Image1), excluding all other elements (background, subject's body, especially the face).
-    Maintain the exact color, texture, shape, dimensions, patterns (e.g., 'KINGOFTHEKONGO' if applicable), logos, seams, and all other details of the {prenda}. Include all attachments like pockets, buttons, and zippers.
-    II. Integration into Image 2:
+Precisely isolate the {prenda} in (Image1), excluding all other elements (background, subject's body, especially the face).
+Maintain the exact color, texture, shape, dimensions, patterns (e.g., 'KINGOFTHEKONGO' if applicable), logos, seams, and all other details of the {prenda}. Include all attachments like pockets, buttons, and zippers.
+II. Integration into Image 2:
 
-    Completely replace the existing garment in Image 2 with the extracted {prenda}. Do not combine or blend any elements of the original garment in (Image2).
-    Adjust the scale, perspective, and angle of the extracted {prenda} to perfectly match the subject's pose in Image 2, ensuring it drapes and fits naturally.
-    Realistically adapt the lighting, shadows, and reflections on the inserted {prenda} to match the light source in Image 2, creating a three-dimensional appearance and natural contact shadows.
-    III. Image 2 Preservation (Non-Negotiable):
+Completely replace the existing garment in Image 2 with the extracted {prenda}. Do not combine or blend any elements of the original garment in (Image2).
+Adjust the scale, perspective, and angle of the extracted {prenda} to perfectly match the subject's pose in Image 2, ensuring it drapes and fits naturally.
+Realistically adapt the lighting, shadows, and reflections on the inserted {prenda} to match the light source in Image 2, creating a three-dimensional appearance and natural contact shadows.
+III. Image 2 Preservation (Non-Negotiable):
 
-    The subject's face in Image 2 must remain 100% identical to the original.
-    All other elements of the subject (hair, accessories, other clothing) and the entire background of Image 2 must remain unchanged.
-    The editing should be strictly limited to the area of the replaced {prenda}, without any spillover or alterations to surrounding areas.
-    Negative Constraints:
+The subject's face in Image 2 must remain 100% identical to the original.
+All other elements of the subject (hair, accessories, other clothing) and the entire background of Image 2 must remain unchanged.
+The editing should be strictly limited to the area of the replaced {prenda}, without any spillover or alterations to surrounding areas.
+Negative Constraints:
 
-    Do not combine or fuse any features of the original garment in Image 2 with the {prenda} from Image 1.
-    Absolutely no modifications to the subject's face, hair, or expression are allowed.
-    Do not alter any accessories, other clothing, or background elements in Image 2.
-    Do not add any new shadows, reflections, or effects that are not directly a result of the inserted {prenda} and its interaction with the existing lighting.
-    Avoid any blending or merging that compromises the natural appearance and volume of the inserted {prenda}."
-    Key Changes in the Revision:
+Do not combine or fuse any features of the original garment in Image 2 with the {prenda} from Image 1.
+Absolutely no modifications to the subject's face, hair, or expression are allowed.
+Do not alter any accessories, other clothing, or background elements in Image 2.
+Do not add any new shadows, reflections, or effects that are not directly a result of the inserted {prenda} and its interaction with the existing lighting.
+Avoid any blending or merging that compromises the natural appearance and volume of the inserted {prenda}."
+Key Changes in the Revision:
 
-    More Direct Opening: Starts with the core task and immediate constraints.
-    Streamlined Language: Uses slightly less technical jargon where the outcome is clearer.
-    Emphasis on Non-Negotiables: Highlights the critical preservation aspects early and repeats them in the negative constraints.
-    Focus on Outcome: Describes the desired visual effect rather than the specific technical steps the AI should take (which it doesn't directly control)."""
-    "Asegúrate de que la prenda insertada se adapte de forma realista a la forma del cuerpo del sujeto en la Imagen 2, respetando los contornos, pliegues naturales y cómo caería la tela según su postura."
-    f"La salida esperada es la image2 con la nueva prenda {prenda} integrada de forma realista y natural, manteniendo la cara y el fondo sin cambios. El resultado debe ser una imagen que parezca auténtica y profesional, como si la prenda siempre hubiera estado en la imagen original."
-    f"The expected output is the image2 with the new {prenda} integrated realistically and naturally, keeping the face and background unchanged. The result should be an image that looks authentic and professional, as if the {prenda} had always been in the original image."
-    ) 
-
-    response = client.models.generate_content(
+More Direct Opening: Starts with the core task and immediate constraints.
+Streamlined Language: Uses slightly less technical jargon where the outcome is clearer.
+Emphasis on Non-Negotiables: Highlights the critical preservation aspects early and repeats them in the negative constraints.
+Focus on Outcome: Describes the desired visual effect rather than the specific technical steps the AI should take (which it doesn't directly control)."""
+"Asegúrate de que la prenda insertada se adapte de forma realista a la forma del cuerpo del sujeto en la Imagen 2, respetando los contornos, pliegues naturales y cómo caería la tela según su postura."
+f"La salida esperada es la image2 con la nueva prenda {prenda} integrada de forma realista y natural, manteniendo la cara y el fondo sin cambios. El resultado debe ser una imagen que parezca auténtica y profesional, como si la prenda siempre hubiera estado en la imagen original."
+f"The expected output is the image2 with the new {prenda} integrated realistically and naturally, keeping the face and background unchanged. The result should be an image that looks authentic and professional, as if the {prenda} had always been in the original image."
+)
+    gen_resp = client.models.generate_content(
         model="gemini-2.0-flash-exp-image-generation",
-        contents=[
-            prompt,
-            img_prenda,    
-            img_usuario    
-        ],
-        config=types.GenerateContentConfig(response_modalities=['Text', 'Image'])
+        contents=[prompt, img_prenda, img_usuario],
+        config=types.GenerateContentConfig(response_modalities=["Image"])
     )
 
-    img_result = None
-    for part in response.candidates[0].content.parts:
-        if hasattr(part, "inline_data") and part.inline_data:
-            img_result = Image.open(BytesIO(part.inline_data.data))
+    # Extraer bytes de la imagen generada
+    img_data = None
+    for part in gen_resp.candidates[0].content.parts:
+        if getattr(part, "inline_data", None):
+            img_data = part.inline_data.data
             break
+    if img_data is None:
+        raise HTTPException(500, "Gemini no devolvió la imagen resultante")
 
-    if img_result is None:
-        raise HTTPException(status_code=500, detail="Gemini no devolvió imagen resultante")
-
-    # >>> Cambia este bloque <<<
-    output_buf = BytesIO()
-    img_result.save(output_buf, format="JPEG", quality=90)
-    output_buf.seek(0)
-
-    # 2) Subir en background
+    # 4) Subir a Cloudinary
+    buf = BytesIO(img_data)
     try:
-        url_result, public_id = await upload_image_to_cloudinary(
-            output_buf, folder="historial"
-        )
+        url, _ = await upload_image_to_cloudinary(buf, folder="historial")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"No pude subir a Cloudinary: {e}")
+        raise HTTPException(500, f"Error subiendo imagen: {e}")
 
-    # 3) Actualizar historial en Mongo (y borrar antiguas)
-    usuario = db["usuarios"].find_one({"_id": ObjectId(user_id)})
-    if not usuario:
-        raise HTTPException(404, "Usuario no encontrado")
-
-    historial = usuario.get("historial", [])
-    if len(historial) >= 5:
-        antiguo = historial.pop(0)
-        # borramos la imagen antigua ASÍNCRONAMENTE
-        if "public_id" in antiguo:
-            await delete_image_cloudinary(antiguo["public_id"])
-
-    historial.append({"url": url_result, "public_id": public_id})
-    db["usuarios"].update_one(
-        {"_id": ObjectId(user_id)},
-        {"$set": {"historial": historial}}
-    )
-
-    return {
-        "img_generada": url_result,
-        "historial": [h["url"] for h in historial]
-    }
+    # 5) Devolver solo la URL
+    return {"img_generada": url}
