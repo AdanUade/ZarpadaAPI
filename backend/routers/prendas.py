@@ -2,6 +2,7 @@ from fastapi import APIRouter, File, UploadFile, Form
 from backend.models.prenda import PrendaCreate, PrendaOut
 from backend.db.mongo import db
 from backend.utils.cloudinary_helper import upload_image_to_cloudinary
+from backend.models.user import UserCreate, UserOut
 
 router = APIRouter()
 

@@ -7,7 +7,7 @@ from PIL import Image
 from bson.objectid import ObjectId
 from google import genai
 from google.genai import types
-
+from backend.models.user import UserCreate, UserOut
 from utils.cloudinary_helper import upload_image_to_cloudinary
 from backend.db.mongo import db
 
