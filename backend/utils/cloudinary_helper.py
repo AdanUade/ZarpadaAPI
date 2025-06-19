@@ -1,6 +1,7 @@
 import cloudinary
 import cloudinary.uploader
 import os
+from fastapi import UploadFile
 
 cloudinary.config(
     cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
