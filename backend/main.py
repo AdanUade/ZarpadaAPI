@@ -4,8 +4,16 @@ from backend.routers.users import router as user_router
 from backend.routers.prendas import router as prendas_router
 from backend.routers.imagen import router as imagen_router
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://havikhavik.github.io"],  
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(user_router, prefix="/api", tags=["usuarios"])
 app.include_router(prendas_router, prefix="/api", tags=["prendas"])
