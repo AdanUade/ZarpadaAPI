@@ -53,8 +53,12 @@ def obtener_usuario(user_id: str):
 def obtener_usuario_por_email(email: str):
     u = db["usuarios"].find_one({"email": email})
     if not u:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    return normalize_user(u)
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    try:
+        user = normalize_user(u)
+    except Exception as e:
+        raise
+    return user
 
 @router.patch("/{user_id}", response_model=UserOut)
 async def editar_usuario(
