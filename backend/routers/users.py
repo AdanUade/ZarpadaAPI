@@ -42,11 +42,17 @@ async def crear_usuario(user: UserCreate):
     nuevo = db["usuarios"].find_one({"_id": res.inserted_id})
     return normalize_user(nuevo)
 
-@router.get("/buscar_por_email", response_model=UserOut)
-def buscar_usuario_por_email(email: str):
-    u = db["usuarios"].find_one({"email": email})
+@router.get("/login", response_model=UserOut)
+def login(email: str, password: str):
+    u = db["usuarios"].find_one({
+        "email": email,
+        "password": password
+    })
     if not u:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Email o contraseña incorrectos"
+        )
     return normalize_user(u)
 
 @router.get("/", response_model=list[UserOut])
