@@ -7,17 +7,22 @@ from backend.utils.cloudinary_helper import upload_image_to_cloudinary, delete_i
 router = APIRouter(prefix="/usuarios", tags=["usuarios"])
 
 def normalize_user(u: dict) -> dict:
-    u["id"] = str(u["_id"])
-    # Convertimos dicts → URLs (strings) para el esquema UserOut
-    u["historial"] = [
-        entry["url"] if isinstance(entry, dict) else entry
-        for entry in u.get("historial", [])
-    ]
-    u["favoritos"] = [
-        entry["url"] if isinstance(entry, dict) else entry
-        for entry in u.get("favoritos", [])
-    ]
-    return u
+    return {
+        "id": str(u["_id"]),
+        "username": u.get("username", ""),
+        "email": u.get("email", ""),
+        "rol": u.get("rol", ""),
+        "profile_image_path": u.get("profile_image_path"),
+        "historial": [
+            entry["url"] if isinstance(entry, dict) and "url" in entry else str(entry)
+            for entry in u.get("historial", [])
+        ],
+        "favoritos": [
+            entry["url"] if isinstance(entry, dict) and "url" in entry else str(entry)
+            for entry in u.get("favoritos", [])
+        ],
+    }
+
 
 @router.post("/", response_model=UserOut)
 async def crear_usuario(user: UserCreate):
@@ -50,15 +55,11 @@ def obtener_usuario(user_id: str):
     return normalize_user(u)
     
 @router.get("/buscar_por_email", response_model=UserOut)
-def obtener_usuario_por_email(email: str):
+def buscar_usuario_por_email(email: str):
     u = db["usuarios"].find_one({"email": email})
     if not u:
-            raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    try:
-        user = normalize_user(u)
-    except Exception as e:
-        raise
-    return user
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    return normalize_user(u)
 
 @router.patch("/{user_id}", response_model=UserOut)
 async def editar_usuario(
