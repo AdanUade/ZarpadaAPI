@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, status
 from bson.objectid import ObjectId
 from backend.db.mongo import db
 from backend.models.user import UserCreate, UserOut
@@ -41,30 +41,26 @@ async def crear_usuario(user: UserCreate):
     res = db["usuarios"].insert_one(user_dict)
     nuevo = db["usuarios"].find_one({"_id": res.inserted_id})
     return normalize_user(nuevo)
-    
+
+@router.get("/buscar_por_email", response_model=UserOut)
+def buscar_usuario_por_email(email: str):
+    u = db["usuarios"].find_one({"email": email})
+    if not u:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    return normalize_user(u)
+
 @router.get("/", response_model=list[UserOut])
-def listar_o_buscar_usuarios(
-    email: str | None = Query(None, description="Filtrar por email"),
-    user_id: str | None = Query(None, description="Filtrar por user_id")
-):
-    if email:
-        u = db["usuarios"].find_one({"email": email})
-        if not u:
-            raise HTTPException(status_code=404, detail="Usuario no encontrado")
-        return [normalize_user(u)]
-    if user_id:
-        try:
-            obj = ObjectId(user_id)
-        except Exception:
-            raise HTTPException(status_code=400, detail="user_id inválido")
-        u = db["usuarios"].find_one({"_id": obj})
-        if not u:
-            raise HTTPException(status_code=404, detail="Usuario no encontrado")
-        return [normalize_user(u)]
-    # Sin filtros, devuelvo todos
+def obtener_usuarios():
     users = list(db["usuarios"].find())
     return [normalize_user(u) for u in users]
 
+@router.get("/{user_id}", response_model=UserOut)
+def obtener_usuario(user_id: str):
+    u = db["usuarios"].find_one({"_id": ObjectId(user_id)})
+    if not u:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    return normalize_user(u)
+    
 @router.patch("/{user_id}", response_model=UserOut)
 async def editar_usuario(
     user_id: str,
