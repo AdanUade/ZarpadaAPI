@@ -21,6 +21,11 @@ def normalize_user(u: dict) -> dict:
 
 @router.post("/", response_model=UserOut)
 async def crear_usuario(user: UserCreate):
+    if db["usuarios"].find_one({"email": user.email}):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="El email ya está registrado."
+        )
     user_dict = user.dict()
     user_dict.update({
         "historial": [],
@@ -40,6 +45,13 @@ def obtener_usuarios():
 @router.get("/{user_id}", response_model=UserOut)
 def obtener_usuario(user_id: str):
     u = db["usuarios"].find_one({"_id": ObjectId(user_id)})
+    if not u:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    return normalize_user(u)
+    
+@router.get("/buscar_por_email", response_model=UserOut)
+def obtener_usuario_por_email(email: str):
+    u = db["usuarios"].find_one({"email": email})
     if not u:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     return normalize_user(u)
